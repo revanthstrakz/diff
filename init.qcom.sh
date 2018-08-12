@@ -89,7 +89,7 @@ start_msm_irqbalance_8939()
 	fi
 }
 
-start_msm_irqbalance660()
+start_msm_irqbalance()
 {
 	if [ -f /vendor/bin/msm_irqbalance ]; then
 		case "$platformid" in
@@ -99,21 +99,6 @@ start_msm_irqbalance660()
 			start vendor.msm_irqbl_sdm630;;
 		esac
 	fi
-}
-
-start_msm_irqbalance()
-{
-	if [ -f /vendor/bin/msm_irqbalance ]; then
-		start vendor.msm_irqbalance
-	fi
-}
-
-start_copying_prebuilt_qcril_db()
-{
-    if [ -f /vendor/radio/qcril_database/qcril.db -a ! -f /data/vendor/radio/qcril.db ]; then
-        cp /vendor/radio/qcril_database/qcril.db /data/vendor/radio/qcril.db
-        chown -h radio.radio /data/vendor/radio/qcril.db
-    fi
 }
 
 baseband=`getprop ro.baseband`
@@ -212,7 +197,7 @@ case "$target" in
                   esac
                   ;;
        esac
-        start_msm_irqbalance660
+        start_msm_irqbalance
         ;;
     "apq8084")
         platformvalue=`cat /sys/devices/soc0/hw_platform`
@@ -341,17 +326,13 @@ case "$target" in
              "293" | "304" | "338" )
                   case "$hw_platform" in
                        "Surf")
-                                    #setprop qemu.hw.mainkeys 0
+                                    setprop qemu.hw.mainkeys 0
                                     ;;
                        "MTP")
-                                    #setprop qemu.hw.mainkeys 0
+                                    setprop qemu.hw.mainkeys 0
                                     ;;
                        "RCM")
-                                    #setprop qemu.hw.mainkeys 0
-                                    ;;
-                       "QRD")
                                     setprop qemu.hw.mainkeys 0
-                                    #setprop qemu.hw.mainkeys 0
                                     ;;
                   esac
                   ;;
@@ -359,11 +340,8 @@ case "$target" in
         ;;
 esac
 
-#
-# Copy qcril.db if needed for RIL
-#
-start_copying_prebuilt_qcril_db
-echo 1 > /data/vendor/radio/db_check_done
+# Set shared touchpanel nodes ownership (these are proc_symlinks to the real sysfs nodes)
+chown -LR system.system /proc/touchpanel
 
 #
 # Make modem config folder and copy firmware config to that folder for RIL
@@ -386,10 +364,10 @@ if [ ! -f /firmware/verinfo/ver_info.txt -o "$prev_version_info" != "$cur_versio
 fi
 cp /firmware/image/modem_pr/mbn_ota.txt /data/vendor/radio/modem_config
 chown radio.radio /data/vendor/radio/modem_config/mbn_ota.txt
-cp /firmware/image/modem_pr/mbn_oin.txt /data/vendor/radio/modem_config
-chown radio.radio /data/vendor/radio/modem_config/mbn_oin.txt
-cp /firmware/image/modem_pr/mbn_ogl.txt /data/vendor/radio/modem_config
-chown radio.radio /data/vendor/radio/modem_config/mbn_ogl.txt
+cp /firmware/image/modem_pr/mbn_oin.txt /data/misc/radio/modem_config
+chown radio.radio /data/misc/radio/modem_config/mbn_oin.txt
+cp /firmware/image/modem_pr/mbn_ogl.txt /data/misc/radio/modem_config
+chown radio.radio /data/misc/radio/modem_config/mbn_ogl.txt
 echo 1 > /data/vendor/radio/copy_complete
 
 #check build variant for printk logging
@@ -405,3 +383,12 @@ case "$buildvariant" in
         echo "4 4 1 4" > /proc/sys/kernel/printk
         ;;
 esac
+
+
+# Hack to get IMS up and running on GSI
+
+if [ -f /data/system/users/0/settings_global.xml ]; then
+    sed -i 's/"multi_sim_data_call" value="1"/"multi_sim_data_call" value="-1"/g' /data/system/users/0/settings_global.xml
+    restorecon /data/system/users/0/settings_global.xml
+fi
+
